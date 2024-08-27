@@ -9,8 +9,9 @@ export type Mint = {
   streamId?: string;
   streamRecipient?: string;
   unlockedWormhole?: number;
-  // claimableWormhole?: number;
-  // claimedWormhole?: number;
+  claimableWormhole?: number;
+  claimedWormhole?: number;
   lockedWormhole?: number;
   remainingWormhole?: number;
+  vestingPerDay?: number;
 };

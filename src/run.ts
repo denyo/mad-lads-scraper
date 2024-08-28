@@ -7,6 +7,7 @@ import type { Account, Mint } from './models';
 import { StreamflowSolana, calculateUnlockedAmount, getBN, getNumberFromBN } from '@streamflow/stream';
 import { mintIdToStreamMapping } from './mintIdToStreamMapping';
 import { decodeStream } from '@streamflow/stream/solana';
+import { base64ToUint8Array, decodeStreamflowProgramAccount, getStreamflowProgramAccounts } from './utils';
 
 const targetDir = path.resolve('./results');
 const resultOriginAccountHistoryPath = path.resolve(targetDir, 'result-origin-account-history.json');
@@ -199,61 +200,6 @@ const getMintsWithStreams = async (): Promise<Mint[]> => {
   return mintsWithStreams;
 };
 
-const base64ToUint8Array = (base64_string: string): Uint8Array => {
-  return Uint8Array.from(atob(base64_string), (c) => c.charCodeAt(0));
-};
-
-type ProgramAccount = typeof programAccount;
-const programAccount = {
-  account: {
-    data: [
-      'AAAAAAAAAAADhuAMZgAAAAAAAAAAAAAAAAAAAAAAAAAAOHHuZwAAAAAAAAAAAAAAAA3gB9Xe6p7/5baCiT9KPSEVnw/vXjSv9l+smY6Sanfd4TLJZ7wvMyiX2nfBaCOkryzq/QhexbJ4CHoKfI/ssDF3adGe/6AeMbSdGQt4drT/YIc5MglH7DR9YR6+56XafjJuIzCTTARPn4pZzovb2QzF2qNSFqcepPSlX3Y7gqo9aSf9wB6pBvltcTeHTN162tAMo1dkYZMQ5UGWx4HYTVvrxgdhaM2aktsqdKuEipGpQfFW01ZqYINgooB9BGDsPkHl5R1mQ0ba9Ai8PKVNKf8XMsMfSRvbApBNvbh6jHDCvEI55RNCGAMMAs8csdNVL28oVMUHRkQPAi5D81M1AtkAAAAAAAAAAAAAAAAAAAAAAAAAAA3gB9Xe6p7/5baCiT9KPSEVnw/vXjSv9l+smY6Sanfd4TLJZ7wvMyiX2nfBaCOkryzq/QhexbJ4CHoKfI/ssDEAAAAAAAAAAAAAAAAAAAAAAAAAALg9DWYAAAAAAKCsuQMAAACAUQEAAAAAAKOSGAIAAAAAuD0NZgAAAAAAILy+AAAAAAAAAQAAAFdvcm1ob2xlIEFpcmRyb3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-      'base64',
-    ],
-    executable: false,
-    lamports: 8574720,
-    owner: 'strmdbLr6w7QNmsiEXyFwWg3VSfg1GiELgU27P8aCGw',
-    rentEpoch: 18446744073709552000,
-    space: 1104,
-  },
-  pubkey: '3PMwuJMq5uBKDZn9eJHwrfb8XALSEbYjzgrcfo5Y3Kfm',
-};
-
-const getStreamflowProgramAccounts = async (): Promise<ProgramAccount[]> => {
-  // let programAccounts: ProgramAccount[] = fs.existsSync(resultProgramAccountsPath)
-  //   ? JSON.parse(fs.readFileSync(resultProgramAccountsPath, 'utf8'))
-  //   : [];
-
-  // if (!programAccounts.length) {
-  const data = (await fetch(helius.endpoint, {
-    body: JSON.stringify({
-      method: 'getProgramAccounts',
-      jsonrpc: '2.0',
-      params: [
-        'strmdbLr6w7QNmsiEXyFwWg3VSfg1GiELgU27P8aCGw',
-        {
-          encoding: 'base64',
-          commitment: 'confirmed',
-          filters: [
-            { memcmp: { offset: 49, bytes: originAccount } },
-            { memcmp: { offset: 177, bytes: wormHoleTokenAddress } },
-          ],
-        },
-      ],
-      id: '3d207021-0c53-45de-ad07-8bed7a8b492d',
-    }),
-    method: 'POST',
-  }).then((res) => res.json())) as { result: ProgramAccount[] };
-
-  const programAccounts: ProgramAccount[] = data.result;
-
-  fs.mkdirSync(targetDir, { recursive: true });
-  fs.writeFileSync(resultProgramAccountsPath, JSON.stringify(programAccounts, null, 2));
-  // }
-
-  return programAccounts;
-};
-
 const getMintsWithStreamData = async (): Promise<Mint[]> => {
   let mintsWithStreamData: Mint[] = fs.existsSync(resultMintsWithStreamDataPath)
     ? JSON.parse(fs.readFileSync(resultMintsWithStreamDataPath, 'utf8'))
@@ -273,46 +219,20 @@ const getMintsWithStreamData = async (): Promise<Mint[]> => {
       mints.some((mint) => mint.streamId === item.pubkey),
     );
 
-    const streams = programAccountsWithMapping
-      .filter((item) => item.pubkey)
-      .map((item) => ({ streamId: item.pubkey, data: item.account.data[0] }));
-
-    const decodedStreams = streams.map((stream) => ({
-      streamId: stream.streamId,
-      data: decodeStream(base64ToUint8Array(stream.data) as Buffer),
-    }));
-
-    const now = new Date().getTime();
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.writeFileSync(resultProgramAccountsPath, JSON.stringify(programAccountsWithMapping, null, 2));
 
     mintsWithStreamData = mints
       .map<Mint>((mint) => {
-        const { data } = decodedStreams.find((item) => item.streamId === mint.streamId);
-
-        const cliffAmount = data.cliffAmount.toNumber();
-        const lastWithdrawnDate = data.lastWithdrawnAt.gt(data.cliff);
-        const claimedAmount = data.withdrawnAmount.toNumber();
-        const vestedTime = now / 1000 - data.start.toNumber();
-        const u = Math.floor(data.depositedAmount.toNumber() / data.amountPerPeriod.toNumber());
-        const d = Math.floor(
-          (Math.max(data.lastWithdrawnAt.toNumber(), data.start.toNumber()) - data.start.toNumber()) /
-            data.period.toNumber(),
-        );
-        const f = Math.min(u, Math.floor(vestedTime / data.period.toNumber()));
-        const h = Math.min(u, f - d);
-        const vestedAmountPerDay = data.amountPerPeriod.toNumber() * (data.period.toNumber() / 86400);
-        const claimableAmount = h * data.amountPerPeriod.toNumber() + (lastWithdrawnDate ? 0 : cliffAmount);
+        const programAccount = programAccountsWithMapping.find((item) => item.pubkey === mint.streamId);
 
         const extendedMint: Mint = {
           ...mint,
-          lockedWormhole: formatWormhole(data.depositedAmount.sub(data.withdrawnAmount).toNumber() - claimableAmount),
-          claimedWormhole: formatWormhole(claimedAmount),
-          vestingPerDay: formatWormhole(vestedAmountPerDay),
-          claimableWormhole: formatWormhole(claimableAmount),
-          remainingWormhole: formatWormhole(data.depositedAmount.toNumber() - claimedAmount),
+          ...decodeStreamflowProgramAccount(programAccount),
         };
         return extendedMint;
       })
-      .sort((a, b) => (a.remainingWormhole < b.remainingWormhole ? 1 : -1));
+      .sort((a, b) => (a.claimableWormhole < b.claimableWormhole ? 1 : -1));
 
     fs.mkdirSync(targetDir, { recursive: true });
     fs.writeFileSync(resultMintsWithStreamDataPath, JSON.stringify(mintsWithStreamData, null, 2));
@@ -321,9 +241,7 @@ const getMintsWithStreamData = async (): Promise<Mint[]> => {
   return mintsWithStreamData;
 };
 
-const wormholeDecimals = Math.pow(10, 6);
-const formatWormhole = (value: number): number => Math.floor((value / wormholeDecimals) * 100) / 100;
-
+// TODO: tensor fav
 // what about unmapped token accounts (4073 mapped streams vs 6467 programAccounts vs 6471 wormhole accounts)?
 
 const run = async (): Promise<void> => {

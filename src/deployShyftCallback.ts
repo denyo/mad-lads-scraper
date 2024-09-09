@@ -58,14 +58,13 @@ const deleteCallback = async (callbackId: string): ReturnType<typeof shyft.callb
   const mints: Mint[] = fs.existsSync(resultMintsWithStreamDataPath)
     ? JSON.parse(fs.readFileSync(resultMintsWithStreamDataPath, 'utf8'))
     : [];
-  
-  if (mints.length) {
-    // TODO: check claimable?
-    const mintIds = mints.filter(mint => mint.remainingWormhole > 10000).map(mint => mint.id)
 
-    const result = await registerCallback(mintIds);
+  if (mints.length) {
+    const mintIds = mints.filter((mint) => mint.claimableWormhole > 2000).map((mint) => mint.id);
+
+    const result = await updateCallback('66cc247c2b8d73261e4b9ce9', mintIds);
     console.log(result);
   } else {
-    throw new Error(`couldn't read mints from ${resultMintsWithStreamDataPath}`)
+    throw new Error(`couldn't read mints from ${resultMintsWithStreamDataPath}`);
   }
 })();

@@ -68,8 +68,11 @@ export const decodeStreamflowProgramAccount = (programAccount: ProgramAccount): 
   const vestedAmountPerDay = data.amountPerPeriod.toNumber() * (data.period.toNumber() / 86400);
   const claimableAmount = h * data.amountPerPeriod.toNumber() + (lastWithdrawnDate ? 0 : cliffAmount);
 
+  const lockedAmount = data.depositedAmount.sub(data.withdrawnAmount).toNumber() - claimableAmount;
+
   return {
-    lockedWormhole: formatWormhole(data.depositedAmount.sub(data.withdrawnAmount).toNumber() - claimableAmount),
+    lockedWormhole: formatWormhole(lockedAmount),
+    unlockedWormhole: formatWormhole(data.depositedAmount.toNumber() - lockedAmount),
     claimedWormhole: formatWormhole(claimedAmount),
     vestingPerDay: formatWormhole(vestedAmountPerDay),
     claimableWormhole: formatWormhole(claimableAmount),

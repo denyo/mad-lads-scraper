@@ -180,7 +180,7 @@ const getMadLadsMints = async (): Promise<Mint[]> => {
 };
 
 const getMintsWithStreams = async (): Promise<Mint[]> => {
-  let mintsWithStreams = fs.existsSync(resultMintsWithStreamsPath)
+  let mintsWithStreams: Mint[] = fs.existsSync(resultMintsWithStreamsPath)
     ? JSON.parse(fs.readFileSync(resultMintsWithStreamsPath, 'utf8'))
     : [];
 
@@ -241,7 +241,6 @@ const getMintsWithStreamData = async (): Promise<Mint[]> => {
   return mintsWithStreamData;
 };
 
-// TODO: tensor fav
 // what about unmapped token accounts (4073 mapped streams vs 6467 programAccounts vs 6471 wormhole accounts)?
 
 const run = async (): Promise<void> => {
